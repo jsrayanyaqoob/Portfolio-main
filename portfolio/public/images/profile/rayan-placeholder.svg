@@ -1,0 +1,14 @@
+<svg viewBox="0 0 640 860" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bust" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d4d4d8" />
+      <stop offset="100%" stop-color="#a1a1aa" />
+    </linearGradient>
+  </defs>
+  <ellipse cx="320" cy="255" rx="118" ry="140" fill="url(#bust)" />
+  <path d="M275 370 L275 430 Q275 460 320 460 Q365 460 365 430 L365 370 Z" fill="url(#bust)" />
+  <path
+    d="M110 860 C110 630 175 495 320 495 C465 495 530 630 530 860 Z"
+    fill="url(#bust)"
+  />
+</svg>
