@@ -6,7 +6,7 @@ import { useUIStore } from "@/lib/store";
 // "home" / "about" / "skills" are set from scroll progress inside the pinned
 // portrait experience (see animations/portrait-timeline.ts). This only
 // tracks the normal, non-pinned sections that follow it.
-const SECTION_IDS = ["projects", "experience", "contact"];
+const SECTION_IDS = ["projects", "tech-stack", "experience", "contact"];
 
 export function SectionObserver() {
   const setActiveSection = useUIStore((s) => s.setActiveSection);

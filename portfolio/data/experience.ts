@@ -11,20 +11,19 @@ export interface ExperienceItem {
 
 export const experience: ExperienceItem[] = [
   {
-    id: "internee",
-    organization: "Internee.pk",
-    role: "Frontend Developer Intern",
-    period: "Internship",
+    id: "saylani-internship",
+    organization: "Saylani Mass IT Training",
+    role: "Web Development Intern",
+    period: "Present",
     type: "Internship",
     description:
-      "Worked on AI-powered application interfaces, building resume analysis tooling and a conversational chatbot experience with React and third-party APIs.",
+      "Currently interning on the web development team, building production-facing React applications and collaborating with the broader engineering team on full-stack features.",
     highlights: [
-      "Built an AI Resume Analyzer with resume parsing and AI-generated feedback",
-      "Developed an AI-powered chatbot interface",
-      "Integrated third-party APIs into React applications",
-      "Collaborated on responsive, production-facing UI",
+      "Building responsive, production-facing React applications",
+      "Collaborating with the team on full-stack features",
+      "Applying full-stack fundamentals from training in a real production setting",
     ],
-    technologies: ["React", "JavaScript", "REST APIs", "AI APIs"],
+    technologies: ["React", "JavaScript", "Node.js", "Git"],
   },
   {
     id: "saylani",

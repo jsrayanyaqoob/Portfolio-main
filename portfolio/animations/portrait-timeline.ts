@@ -9,38 +9,40 @@ if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-// A staged walk-on choreography built from a single ~10s clip that already
-// contains real walk-cycle footage (in place, fixed studio backdrop)
-// bookending two arm-cross holds: one facing forward (toward the RAYAN
-// wordmark), one turned back over the shoulder. That second hold is stretched
-// across a long scroll span — he stays put, still turned back, while the
-// About text and then the Skills text each reveal beside him on the right
-// and read out in turn; only once both have shown does he uncross and walk
-// off. Horizontal travel across the screen is simulated with slides + a
-// subtle rotateY turn (the portrait container carries transformPerspective
-// so this reads as a turn, not a flat skew), since the clip itself doesn't
-// translate — but the leg motion inside each walk segment is real footage.
+// He's on screen from the very first paint — no walk-on, no off-screen start.
+// Scroll instead drives which way he's looking, scrubbing through a single
+// ~10s clip of head-turns: neutral -> looks left (giggles) -> looks right
+// (About, then Skills, reveal beside him once his eyes actually land there,
+// while he holds that turn) -> back to center -> looks down -> fades out as
+// the hero section ends. RAYAN slides left as soon as he starts, then fades
+// away entirely right after the giggle — it doesn't linger for the rest of
+// the scene.
 const BEAT = {
-  enterEnd: 0.05, // walks in from off-screen right, arrives centered — video ~1.8s
-  crossPeak: 0.09, // arms crossed, facing forward toward the name — video ~2.6s
-  crossEnd: 0.18, // still held crossed through here — video ~4.2s
-  walkEnd: 0.24, // uncrossed, walked a little further left — video ~5.8s
-  lookBackPeak: 0.28, // re-crosses arms, turns to look back — video ~6.6s; About starts appearing
-  turnStart: 0.8, // About + Skills have both been read; starts uncrossing — video ~7.9s
-  turnEnd: 0.87, // uncrossed, turned to walk away — video ~8.4s
-  exitEnd: 0.97, // walks off-screen left, fades out — video ~9.6s
+  rayanShiftEnd: 0.06, // RAYAN has slid left — video ~1.5s, still neutral
+  lookLeftPeak: 0.14, // looks left — video ~3.0s
+  giggleEnd: 0.2, // the giggle/smile settles — video ~4.25s
+  rayanGone: 0.26, // RAYAN has fully faded out — video ~4.6s, he's blinking/neutral
+  // Fully turned AND settled looking right — not mid-turn. The About/Skills
+  // reveal is pinned to this same point, so it only appears once his eyes
+  // have actually landed on that side, not while he's still turning.
+  lookRightPeak: 0.34, // video ~6.0s
+  aboutOutSkillsIn: 0.52, // About fades out, Skills fades in
+  lookRightHoldEnd: 0.66, // still holding the look right — video ~6.5s, last clean frame
+  backToCenter: 0.72, // turns back to center — video ~8.0s
+  lookDownStart: 0.81, // starts looking down — video ~8.5s
+  lookDownEnd: 0.92, // looking down — video ~9.7s
+  fadeOutEnd: 1, // fully faded, hero section done
 };
 
 // Scroll-progress breakpoints (0–1) shared with the navbar so "About" /
 // "Skills" links can jump into the right moment of this same continuous
-// scene. Both reveal beside him on the right while he stays put on the left,
-// turned back "reading" them, one after the other — he only turns and walks
-// off once both have been shown.
+// scene. Both reveal beside him on the right while he holds the look-right
+// turn, one after the other.
 export const SCENES = {
-  aboutStart: BEAT.lookBackPeak,
-  aboutEnd: 0.46,
-  skillsStart: 0.47,
-  skillsEnd: BEAT.turnStart,
+  aboutStart: BEAT.lookRightPeak,
+  aboutEnd: BEAT.aboutOutSkillsIn,
+  skillsStart: 0.54,
+  skillsEnd: BEAT.lookRightHoldEnd,
 };
 
 export interface PortraitRefs {
@@ -71,8 +73,8 @@ function seekVideo(el: HTMLVideoElement, time: number) {
   }
 }
 
-/** Smoothstep ease — used so each leg of the walk accelerates/decelerates
- * naturally instead of moving at a constant linear rate between anchors. */
+/** Smoothstep ease — each beat settles in and out naturally instead of
+ * moving at a constant linear rate between anchors. */
 function smoothstep(t: number) {
   return t * t * (3 - 2 * t);
 }
@@ -92,68 +94,83 @@ function anchored(p: number, anchors: [number, number][]) {
 
 const VIDEO_TIME: [number, number][] = [
   [0, 0],
-  [BEAT.enterEnd, 1.8],
-  [BEAT.crossPeak, 2.6],
-  [BEAT.crossEnd, 4.2],
-  [BEAT.walkEnd, 5.8],
-  [BEAT.lookBackPeak, 6.6],
-  [BEAT.turnStart, 7.9], // holds through the entire About + Skills read
-  [BEAT.turnEnd, 8.4],
-  [BEAT.exitEnd, 9.6],
-  [1, 9.8],
+  [BEAT.rayanShiftEnd, 1.5],
+  [BEAT.lookLeftPeak, 3.0],
+  [BEAT.giggleEnd, 4.25],
+  [BEAT.rayanGone, 4.6], // brief neutral moment (he blinks around here) as RAYAN finishes fading
+  // He's not actually turned right until ~6.0s (confirmed by re-checking the
+  // actual footage frame-by-frame — 5.0-5.75 is still neutral/blinking, not
+  // a turn). Holds through the About + Skills read, capped at 6.5 rather
+  // than the full ~7.25s he's turned — edge quality measured via the keyed
+  // canvas's own alpha channel degrades sharply from 6.6s on (a real halo,
+  // confirmed visually, not just noise) as he starts turning back.
+  [BEAT.lookRightPeak, 6.0],
+  [BEAT.lookRightHoldEnd, 6.5],
+  [BEAT.backToCenter, 8.0],
+  [BEAT.lookDownStart, 8.5],
+  // The last clean frame — past 9.7s the keyed edge degrades sharply again
+  // (likely the clip's own tail-end compression), so this holds here rather
+  // than scrubbing into it. Doesn't cost anything visually since portrait
+  // opacity is already fading to 0 by fadeOutEnd anyway.
+  [BEAT.lookDownEnd, 9.7],
+  [1, 9.7],
 ];
 
-// The clip itself frames him off-center within its own box, and — unlike the
-// old footage — he's actually positioned differently between the two holds
-// (measured by sampling the chroma-keyed canvas's opaque pixels): well
-// right-of-center during the first cross, already left-of-center by the
-// second. He should read as on the right for the first hold (his natural,
-// unshifted framing already puts him there) and on the left for the second.
-const CENTER_CROSS = 0; // right-of-center as filmed — no correction needed
-const CENTER_HOLD = -12; // he's already mostly left-of-frame by the second hold
+// xPercent shifts the h1 by a percentage of its OWN box, which spans the
+// full sticky container (~1270px on a 1280px viewport) — not just the
+// glyphs, which only run ~635px wide, centered inside it. -32% of the full
+// box shifted the actual text partway off-screen on the left (measured: its
+// left edge landed at -90px). -20% keeps a comfortable margin even accounting
+// for the clamp()'d font size being relatively wider on narrower viewports.
+const RAYAN_X: [number, number][] = [
+  [0, 0], // centered, overlapping him, on first paint
+  [BEAT.rayanShiftEnd, -20], // slides left to clear his face, fully on-screen
+  [BEAT.fadeOutEnd, -20],
+];
+
+// RAYAN stays through the look-left + giggle beat, then fades away entirely
+// right after — it doesn't linger off to the side for the rest of the scene.
+const RAYAN_OPACITY: [number, number][] = [
+  [0, 1],
+  [BEAT.giggleEnd, 1],
+  [BEAT.rayanGone, 0],
+  [BEAT.fadeOutEnd, 0],
+];
+
+// He holds his ground the whole scene — no walking — but gets a couple of
+// small nudges so he doesn't collide with text moving around him: right
+// while RAYAN is off to the left during the look-left/giggle beat, and left
+// while turned right so the About/Skills panels (right-aligned) clear him.
 const PORTRAIT_X: [number, number][] = [
-  [0, CENTER_CROSS + 130], // off-screen right
-  [BEAT.enterEnd, CENTER_CROSS], // arrives, centered under the name
-  [BEAT.crossEnd, CENTER_CROSS], // stays there through the "looking at name" hold
-  [BEAT.walkEnd, CENTER_HOLD], // walks a little further left, still clearly on-screen
-  [BEAT.turnEnd, CENTER_HOLD], // holds there through About, the gap, Skills, and the uncross
-  [BEAT.exitEnd, CENTER_HOLD - 57], // then walks off-screen left
-];
-
-const PORTRAIT_ROTATE_Y: [number, number][] = [
-  [0, -8], // walking in, angled
-  [BEAT.enterEnd, 0],
-  [BEAT.walkEnd, -6], // turning as he starts walking left
-  [BEAT.lookBackPeak, -16],
-  [BEAT.turnStart, -16], // holds the look-back turn through the whole read
-  [BEAT.exitEnd, -26], // turned further away, walking off
-];
-
-const PORTRAIT_SCALE: [number, number][] = [
-  [0, 0.92],
-  [BEAT.enterEnd, 1],
-  [BEAT.turnStart, 1],
-  [BEAT.exitEnd, 0.86],
+  [0, 0],
+  [BEAT.rayanShiftEnd, 0],
+  [BEAT.lookLeftPeak, 14],
+  [BEAT.giggleEnd, 14],
+  [BEAT.rayanGone, 0], // settles back to center as he turns to look right
+  [BEAT.lookRightPeak, -18],
+  [BEAT.lookRightHoldEnd, -18],
+  [BEAT.backToCenter, 0],
+  [BEAT.fadeOutEnd, 0],
 ];
 
 const PORTRAIT_OPACITY: [number, number][] = [
-  [0, 0],
-  [0.015, 1],
-  [BEAT.exitEnd - 0.06, 1],
-  [BEAT.exitEnd, 0],
+  [0, 1], // visible immediately, no scroll required
+  [BEAT.lookDownEnd, 1],
+  [BEAT.fadeOutEnd, 0], // fades out once the hero section is done
 ];
 
-const RAYAN_X: [number, number][] = [
-  [BEAT.crossEnd, 0],
-  [BEAT.walkEnd, 14], // drifts right as he starts walking left
+const PORTRAIT_SCALE: [number, number][] = [
+  [0, 1],
+  [BEAT.lookDownEnd, 1.03], // the faintest creep-in over the whole scene
+  [BEAT.fadeOutEnd, 1.05],
 ];
 
 const ANNOTATIONS_OPACITY: [number, number][] = [
   [0, 0],
-  [BEAT.enterEnd, 0],
-  [BEAT.crossPeak, 1], // up while he's facing the name
-  [BEAT.crossEnd, 1],
-  [BEAT.crossEnd + 0.04, 0],
+  [BEAT.rayanShiftEnd, 0],
+  [BEAT.lookLeftPeak, 1], // up while he's turned, looking (and giggling)
+  [BEAT.giggleEnd, 1],
+  [BEAT.giggleEnd + 0.04, 0],
 ];
 
 export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobile: boolean) {
@@ -185,40 +202,32 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
           useUIStore.getState().setActiveSection(nextSection);
         }
 
-        // --- Hero copy: visible through arrival, gone once the cross/turn starts.
-        const heroOut = local(p, BEAT.enterEnd, BEAT.crossPeak);
+        // --- Hero copy: visible at rest, gone as soon as RAYAN starts moving.
+        const heroOut = local(p, 0, BEAT.rayanShiftEnd);
         gsap.set(eyebrow, { opacity: 1 - heroOut, y: -heroOut * 20 });
         gsap.set(tagline, { opacity: 1 - heroOut, y: heroOut * 24 });
         gsap.set(scrollCue, { opacity: 1 - local(p, 0, 0.08) });
 
-        // --- RAYAN typography: shrinks away as he starts walking left, clearing
-        // the right side of the screen before the About text appears there.
-        const rayanFade = clamp01(p / BEAT.walkEnd);
-        const rayanScale = gsap.utils.interpolate(1, 0.55, rayanFade);
-        const rayanY = gsap.utils.interpolate(0, -60, rayanFade);
-        const rayanOpacity = 1 - local(p, BEAT.walkEnd, BEAT.lookBackPeak);
+        // --- RAYAN typography: slides left early, then fades away entirely
+        // once he's done looking left and giggling.
         gsap.set(rayan, {
-          scale: rayanScale,
-          y: rayanY,
           xPercent: anchored(p, RAYAN_X) * xScale,
-          opacity: rayanOpacity,
+          opacity: anchored(p, RAYAN_OPACITY),
         });
 
-        // --- Portrait: walk-on / cross-and-look-at-name / walk / cross-and-look-back / walk-off.
+        // --- Portrait: always visible, mostly holds position — just a
+        // small nudge left while turned right so the panels clear him — and
+        // scrubs through the head-turn clip, fading out once the scene ends.
         gsap.set(portrait, {
           xPercent: anchored(p, PORTRAIT_X) * xScale,
-          rotateY: anchored(p, PORTRAIT_ROTATE_Y),
-          transformPerspective: 1000,
           scale: anchored(p, PORTRAIT_SCALE),
           opacity: anchored(p, PORTRAIT_OPACITY),
         });
 
-        // --- Annotations: up only while he's paused and "looking" at the name.
+        // --- Annotations: up while he's looking left and giggling.
         gsap.set(annotations, { opacity: anchored(p, ANNOTATIONS_OPACITY) });
 
-        // --- About panel: reveals on the right while he's turned back looking
-        // at it from the left side of the screen — first of the two texts he
-        // "reads" before walking off.
+        // --- About panel: reveals on the right while he's turned, looking at it.
         const aboutIn = local(p, SCENES.aboutStart, SCENES.aboutStart + 0.05);
         const aboutOut = local(p, SCENES.aboutEnd - 0.04, SCENES.aboutEnd);
         gsap.set(aboutPanel, {
@@ -227,8 +236,7 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
           pointerEvents: aboutIn > 0.5 && aboutOut < 0.5 ? "auto" : "none",
         });
 
-        // --- Skills panel: same right-side spot, right after About — he's
-        // still standing in the same place, still turned back reading.
+        // --- Skills panel: same spot, right after About, same held turn.
         const skillsIn = local(p, SCENES.skillsStart, SCENES.skillsStart + 0.04);
         const skillsOut = local(p, SCENES.skillsEnd - 0.05, SCENES.skillsEnd);
         gsap.set(skillsPanel, {
@@ -248,16 +256,13 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
       start: "top top",
       end: "bottom bottom",
       // scrub: true (not a duration) ties progress 1:1 to scroll position —
-      // no easing lag chasing behind the scrollbar. Combined with the
-      // all-keyframe video encode, the pose tracks scroll exactly instead of
-      // catching up after you stop.
+      // no easing lag chasing behind the scrollbar.
       scrub: true,
       onUpdate: (self) => applyProgress(self.progress),
     });
 
     // ScrollTrigger's onUpdate doesn't fire until the first scroll tick, so
-    // without this the walk-on choreography's start state (off-screen,
-    // invisible) never applies and he'd just appear centered on load.
+    // without this he wouldn't render in his correct at-rest state on load.
     applyProgress(trigger.progress);
 
     return () => trigger.kill();

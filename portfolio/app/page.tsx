@@ -4,6 +4,7 @@ import { Navbar } from "@/components/navigation/navbar";
 import { SectionObserver } from "@/components/layout/section-observer";
 import { PortraitExperience } from "@/components/portrait/portrait-experience";
 import { Projects } from "@/components/projects/projects";
+import { TechStack } from "@/components/skills/tech-stack";
 import { Experience } from "@/components/experience/experience";
 import { Services } from "@/components/services/services";
 import { Contact } from "@/components/contact/contact";
@@ -19,7 +20,7 @@ export default function Home() {
   const portraitSrc = hasRealPortrait ? siteConfig.portraitSrc : siteConfig.portraitPlaceholder;
   const portraitSize = (hasRealPortrait && getImageSize(realPortraitPath)) || PLACEHOLDER_SIZE;
 
-  const hasVideo = existsSync(join(process.cwd(), "public", "mainvideo-seekable.mp4"));
+  const hasVideo = existsSync(join(process.cwd(), "public", "last-seekable.mp4"));
   const videoSrc = hasVideo ? siteConfig.portraitVideoSrc : null;
 
   return (
@@ -29,6 +30,7 @@ export default function Home() {
       <main id="main-content">
         <PortraitExperience portraitSrc={portraitSrc} portraitSize={portraitSize} videoSrc={videoSrc} />
         <Projects />
+        <TechStack />
         <Experience />
         <Services />
         <Contact />

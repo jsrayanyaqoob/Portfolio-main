@@ -15,6 +15,7 @@ const LINKS = [
   { id: "about", label: "About", progress: SCENES.aboutStart + 0.02 },
   { id: "projects", label: "Projects" },
   { id: "skills", label: "Skills", progress: SCENES.skillsStart + 0.02 },
+  { id: "tech-stack", label: "Stack" },
   { id: "experience", label: "Experience" },
   { id: "contact", label: "Contact" },
 ];

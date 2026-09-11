@@ -40,10 +40,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# superseded video takes — only public/mainvideo-seekable.mp4 is actually
-# referenced by the app; these are earlier iterations kept locally for
-# reference, not needed in the deployed bundle
+# superseded video takes — only public/last-seekable.mp4 is actually
+# referenced by the app; these are earlier iterations (and raw, non-seekable
+# sources) kept locally for reference, not needed in the deployed bundle
 /public/video.mp4
 /public/video2.mp4
 /public/video2-seekable.mp4
 /public/mainvideo.mp4
+/public/mainvideo-seekable.mp4
+/public/main.mp4
+/public/main-seekable.mp4
+/public/main-seekable.webm
+/public/last.mp4

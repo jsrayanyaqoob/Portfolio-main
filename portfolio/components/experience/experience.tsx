@@ -7,7 +7,7 @@ export function Experience() {
       <div className="mx-auto max-w-5xl px-6 sm:px-10">
         <Reveal>
           <div className="flex items-baseline gap-4">
-            <span className="font-display text-2xl font-semibold text-text-faint">03</span>
+            <span className="font-display text-2xl font-semibold text-text-faint">04</span>
             <span className="font-mono text-xs uppercase tracking-[0.35em] text-text-dim">Experience</span>
           </div>
         </Reveal>

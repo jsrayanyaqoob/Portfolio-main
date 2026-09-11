@@ -78,12 +78,9 @@ export function PortraitExperience({
           </span>
         </div>
 
-        {/* Portrait, behind the giant RAYAN typography. Top-anchored so the
-            face clears the text band while the torso sits behind it. */}
-        <div
-          ref={portraitRef}
-          className="absolute inset-0 z-0 flex items-start justify-center pt-[4%]"
-        >
+        {/* Portrait, behind the giant RAYAN typography, on screen from the
+            first paint — centered since it's a bust crop, not a full body. */}
+        <div ref={portraitRef} className="absolute inset-0 z-0 flex items-center justify-center">
           {videoSrc ? (
             <PortraitVideo src={videoSrc} videoRef={videoRef} />
           ) : (
@@ -135,8 +132,8 @@ export function PortraitExperience({
           </div>
         </div>
 
-        {/* About scene — reveals on the right, beside him, while he's turned
-            back looking at it from the left side of the screen. */}
+        {/* About scene — reveals on the right, beside him, while he holds
+            the look-right turn as if reading it. */}
         <div
           ref={aboutPanelRef}
           className="absolute inset-0 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"
@@ -144,8 +141,8 @@ export function PortraitExperience({
           <AboutPanel />
         </div>
 
-        {/* Skills scene — same spot, right after About; he's still standing
-            there, still turned back, reading this one next. */}
+        {/* Skills scene — same spot, right after About; he's still holding
+            that same look-right turn, reading this one next. */}
         <div
           ref={skillsPanelRef}
           className="absolute inset-0 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"

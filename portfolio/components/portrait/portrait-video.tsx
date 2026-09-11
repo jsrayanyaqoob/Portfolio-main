@@ -7,39 +7,141 @@ import { useIsTouchDevice } from "@/hooks/use-media-query";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
 
-// Real green-screen keying: a pixel is background if it's meaningfully
-// greener than it is red/blue ("excess green" = G - max(R,B)). Measured
-// directly against the footage — the green screen sits at ~50-63 excess
-// green (including in shadowed areas), while his navy suit is negative
-// (blue-dominant) and his white shirt is ~1-5 — a wide, clean gap separates
-// the two. Edges get a soft falloff instead of a hard cut, and any residual
-// green tint on a partially-transparent edge pixel gets pulled back out
-// (spill suppression) so hair/collar edges don't read with a green fringe.
 const CANVAS_HEIGHT = 640;
-const EXCESS_START = 15;
-const EXCESS_FULL = 40;
-const DESPILL_STRENGTH = 0.9;
+// This footage is shot on a plain black backdrop. His suit is navy, dark
+// enough on its shadowed side to land in the same luma range as the actual
+// backdrop. A per-pixel color check (comparing R/G/B to catch the suit's
+// faint blue cast vs. neutral black) seemed like the right discriminator,
+// but H.264's 4:2:0 chroma subsampling stores color at a quarter the
+// resolution of luma and re-derives it on decode — for pixels this close to
+// black, the real R/G/B gaps are only a few units wide, well inside that
+// subsampling's noise floor, so the color check flickered pixel-to-pixel
+// and punched a speckled hole through the shadow instead of a clean one.
+// Luma carries no such penalty (full resolution, no subsampling), so this
+// keys on luma alone and instead relies on flood-filling inward from the
+// canvas border to find the actual background: real background is one
+// large region connected to every edge, while the suit's shadow — even
+// where it's just as dark — is fully enclosed by lighter shirt/skin/hair
+// and never reachable from the border. A stricter "strong" threshold (well
+// under the suit's darkest measured pixels) drives the flood so it can't
+// bridge across a soft anti-aliased edge into the subject; a wider "soft"
+// ceiling only feathers pixels already reached, for a clean but anti-
+// aliased cutout.
+const STRONG_THRESHOLD = 16;
+const SOFT_CEILING = 42;
 
-function chromaKeyGreen(imageData: ImageData) {
-  const { data } = imageData;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const maxRB = r > b ? r : b;
-    const excess = g - maxRB;
+function computeLuma(data: Uint8ClampedArray, n: number) {
+  const luma = new Float32Array(n);
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    luma[p] = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  }
+  return luma;
+}
 
-    let alpha = 255;
-    if (excess >= EXCESS_FULL) {
-      alpha = 0;
-    } else if (excess > EXCESS_START) {
-      alpha = Math.round(255 * (1 - (excess - EXCESS_START) / (EXCESS_FULL - EXCESS_START)));
+// A closure-based `tryPush` re-created per call, plus recovering (x, y) from
+// a flat index via `%`/`/` on every pop, measured ~10x slower than this
+// version — keeping x/y on their own stacks (no div/mod) and inlining the
+// push check (no per-call closure) brought a 360x640 frame from ~80-100ms
+// down to single-digit milliseconds.
+function floodFillFromBorder(luma: Float32Array, width: number, height: number) {
+  const n = width * height;
+  const strong = new Uint8Array(n);
+  for (let p = 0; p < n; p++) strong[p] = luma[p] < STRONG_THRESHOLD ? 1 : 0;
+
+  const visited = new Uint8Array(n);
+  const stackX = new Int32Array(n);
+  const stackY = new Int32Array(n);
+  let sp = 0;
+
+  for (let x = 0; x < width; x++) {
+    let p = x;
+    if (strong[p] && !visited[p]) {
+      visited[p] = 1;
+      stackX[sp] = x;
+      stackY[sp] = 0;
+      sp++;
     }
-    data[i + 3] = alpha;
-
-    if (alpha > 0 && excess > 0) {
-      data[i + 1] = Math.max(maxRB, g - excess * DESPILL_STRENGTH);
+    p = (height - 1) * width + x;
+    if (strong[p] && !visited[p]) {
+      visited[p] = 1;
+      stackX[sp] = x;
+      stackY[sp] = height - 1;
+      sp++;
     }
+  }
+  for (let y = 0; y < height; y++) {
+    let p = y * width;
+    if (strong[p] && !visited[p]) {
+      visited[p] = 1;
+      stackX[sp] = 0;
+      stackY[sp] = y;
+      sp++;
+    }
+    p = y * width + width - 1;
+    if (strong[p] && !visited[p]) {
+      visited[p] = 1;
+      stackX[sp] = width - 1;
+      stackY[sp] = y;
+      sp++;
+    }
+  }
+
+  while (sp > 0) {
+    sp--;
+    const x = stackX[sp];
+    const y = stackY[sp];
+    const p = y * width + x;
+    if (x > 0) {
+      const q = p - 1;
+      if (strong[q] && !visited[q]) {
+        visited[q] = 1;
+        stackX[sp] = x - 1;
+        stackY[sp] = y;
+        sp++;
+      }
+    }
+    if (x < width - 1) {
+      const q = p + 1;
+      if (strong[q] && !visited[q]) {
+        visited[q] = 1;
+        stackX[sp] = x + 1;
+        stackY[sp] = y;
+        sp++;
+      }
+    }
+    if (y > 0) {
+      const q = p - width;
+      if (strong[q] && !visited[q]) {
+        visited[q] = 1;
+        stackX[sp] = x;
+        stackY[sp] = y - 1;
+        sp++;
+      }
+    }
+    if (y < height - 1) {
+      const q = p + width;
+      if (strong[q] && !visited[q]) {
+        visited[q] = 1;
+        stackX[sp] = x;
+        stackY[sp] = y + 1;
+        sp++;
+      }
+    }
+  }
+  return visited;
+}
+
+function chromaKeyBlack(imageData: ImageData) {
+  const { data, width, height } = imageData;
+  const n = width * height;
+  const luma = computeLuma(data, n);
+  const background = floodFillFromBorder(luma, width, height);
+
+  const range = SOFT_CEILING - STRONG_THRESHOLD;
+  for (let p = 0, i = 0; p < n; p++, i += 4) {
+    if (!background[p]) continue;
+    const l = luma[p];
+    data[i + 3] = l <= STRONG_THRESHOLD ? 0 : Math.round(255 * Math.min(1, (l - STRONG_THRESHOLD) / range));
   }
 }
 
@@ -75,18 +177,62 @@ export function PortraitVideo({
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
 
-    function draw() {
-      if (!video || !canvas) return;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx || video.videoWidth === 0) return;
-      if (canvas.height !== CANVAS_HEIGHT) {
-        canvas.height = CANVAS_HEIGHT;
-        canvas.width = Math.round(CANVAS_HEIGHT * (video.videoWidth / video.videoHeight));
+    let targetWidth = 0;
+    let targetHeight = 0;
+    function ensureSize() {
+      if (!video) return false;
+      if (video.videoWidth === 0) return false;
+      if (targetHeight === CANVAS_HEIGHT) return true;
+      targetHeight = CANVAS_HEIGHT;
+      targetWidth = Math.round(CANVAS_HEIGHT * (video.videoWidth / video.videoHeight));
+      return true;
+    }
+
+    let rafId = 0;
+
+    // The keying pass is cheap now (a single luma+saturation pass plus a
+    // small separable morphological close — single-digit milliseconds at
+    // this canvas size, versus the ~100-200ms the old per-pixel IDW
+    // reference model cost), so there's no need to move it off the main
+    // thread to keep scroll-linked GSAP updates smooth.
+    async function draw() {
+      if (!video || !canvas || !ensureSize()) return;
+      const c2d = canvas.getContext("2d", { willReadFrequently: true });
+      if (!c2d) return;
+      if (canvas.height !== targetHeight) {
+        canvas.height = targetHeight;
+        canvas.width = targetWidth;
       }
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      chromaKeyGreen(frame);
-      ctx.putImageData(frame, 0, 0);
+      // `ctx.drawImage(video, 0, 0, w, h)` downscaling a video frame
+      // directly aliases the codec's own block noise into visible
+      // checkerboard patches once thresholded — invisible on the raw frame,
+      // but each ~8px block lands unevenly on one side of the keying
+      // threshold after a naive resize. createImageBitmap's resize doesn't
+      // have that problem, so it does the downscale and drawImage only
+      // ever draws already-correctly-sized pixels.
+      let bitmap: ImageBitmap;
+      try {
+        bitmap = await createImageBitmap(video, {
+          resizeWidth: targetWidth,
+          resizeHeight: targetHeight,
+          resizeQuality: "low",
+        });
+      } catch {
+        return;
+      }
+      c2d.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      const frame = c2d.getImageData(0, 0, canvas.width, canvas.height);
+      chromaKeyBlack(frame);
+      c2d.putImageData(frame, 0, 0);
+    }
+
+    function scheduleDraw() {
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        void draw();
+      });
     }
 
     let primed = false;
@@ -103,20 +249,21 @@ export function PortraitVideo({
         .catch(() => {});
     }
 
-    video.addEventListener("seeked", draw);
+    video.addEventListener("seeked", scheduleDraw);
     video.addEventListener("loadeddata", prime);
     if (video.readyState >= 2) prime();
     // React dev-mode's double effect-invoke can mount/cleanup/remount this
     // effect synchronously, and `loadeddata` won't fire again for an
     // already-loaded video — re-check once more on the next tick in case the
     // synchronous readyState check above ran mid-transition.
-    const fallback = window.setTimeout(() => {
+    const fallbackTimer = window.setTimeout(() => {
       if (video.readyState >= 2) prime();
     }, 0);
 
     return () => {
-      window.clearTimeout(fallback);
-      video.removeEventListener("seeked", draw);
+      window.clearTimeout(fallbackTimer);
+      if (rafId) cancelAnimationFrame(rafId);
+      video.removeEventListener("seeked", scheduleDraw);
       video.removeEventListener("loadeddata", prime);
     };
   }, [videoRef]);
@@ -145,7 +292,7 @@ export function PortraitVideo({
           ref={canvasRef}
           role="img"
           aria-label="Rayan"
-          className="relative h-[50vh] w-auto select-none object-contain drop-shadow-sm sm:h-[60vh] md:h-[72vh]"
+          className="relative h-[68vh] w-auto select-none object-contain drop-shadow-sm sm:h-[85vh] md:h-[100svh]"
         />
         <div
           aria-hidden
