@@ -51,15 +51,14 @@ function computeLuma(data: Uint8ClampedArray, n: number) {
 // push check (no per-call closure) brought a 360x640 frame from ~80-100ms
 // down to single-digit milliseconds.
 //
-// Tried guarding this against thin single-pixel bridges (erode the
-// candidate mask before flooding, dilate the result back after) to protect
-// enclosed shadow patches that happen to share the backdrop's exact value.
-// It backfired: on real, noisily-compressed video the true background
-// itself is rarely a perfect unbroken block, so eroding it before the flood
-// even starts often disconnects the border from everything past it —
-// measured as low as ~2% of the frame staying transparent, i.e. background
-// barely removed at all. That failure is worse than the speckling it was
-// meant to fix, so this keys directly off the plain (non-eroded) mask.
+// Tried guarding this against thin bridges by eroding the *candidate* mask
+// before flooding. It backfired: on real, noisily-compressed video the true
+// background itself is rarely a perfect unbroken block, so eroding it
+// before the flood even starts often disconnects the border from
+// everything past it — measured as low as ~2% of the frame staying
+// transparent, background barely removed at all. Keying directly off the
+// plain (non-eroded) mask here avoids that; the erosion that actually works
+// runs afterward, on the flood's *result* — see chromaKeyBlack.
 function floodFillFromBorder(strong: Uint8Array, width: number, height: number) {
   const n = width * height;
   const visited = new Uint8Array(n);
@@ -145,6 +144,72 @@ function floodFillFromBorder(strong: Uint8Array, width: number, height: number) 
   return visited;
 }
 
+function erodeHV(mask: Uint8Array, width: number, height: number, r: number) {
+  const h = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      let all = 1;
+      for (let dx = -r; dx <= r && all; dx++) {
+        const xx = x + dx;
+        if (xx < 0 || xx >= width || !mask[row + xx]) all = 0;
+      }
+      h[row + x] = all;
+    }
+  }
+  const out = new Uint8Array(mask.length);
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let all = 1;
+      for (let dy = -r; dy <= r && all; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= height || !h[yy * width + x]) all = 0;
+      }
+      out[y * width + x] = all;
+    }
+  }
+  return out;
+}
+
+function dilateHV(mask: Uint8Array, width: number, height: number, r: number) {
+  const h = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y++) {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+      let any = 0;
+      for (let dx = -r; dx <= r && !any; dx++) {
+        const xx = x + dx;
+        if (xx >= 0 && xx < width && mask[row + xx]) any = 1;
+      }
+      h[row + x] = any;
+    }
+  }
+  const out = new Uint8Array(mask.length);
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      let any = 0;
+      for (let dy = -r; dy <= r && !any; dy++) {
+        const yy = y + dy;
+        if (yy >= 0 && yy < height && h[yy * width + x]) any = 1;
+      }
+      out[y * width + x] = any;
+    }
+  }
+  return out;
+}
+
+// The threshold above is tight enough that a residual thin "tendril" of
+// background can still slip through a gradual shadow on some frames,
+// tearing a band through the suit. Eroding the *candidate* mask before
+// flooding (tried earlier) breaks real background removal, since noisy
+// real background isn't a perfect block either. But the flood's *result*
+// is: by construction, one coherent border-connected blob, not noisy
+// candidate pixels — eroding that only trims things too thin to matter
+// (like this tendril) while a large solid region easily survives, and
+// dilating back after restores its true edge. Opening the result this way
+// is safe where opening the input wasn't.
+const TENDRIL_GUARD_RADIUS = 3;
+
 function chromaKeyBlack(imageData: ImageData) {
   const { data, width, height } = imageData;
   const n = width * height;
@@ -152,7 +217,8 @@ function chromaKeyBlack(imageData: ImageData) {
 
   const strong = new Uint8Array(n);
   for (let p = 0; p < n; p++) strong[p] = luma[p] < STRONG_THRESHOLD ? 1 : 0;
-  const background = floodFillFromBorder(strong, width, height);
+  const reached = floodFillFromBorder(strong, width, height);
+  const background = dilateHV(erodeHV(reached, width, height, TENDRIL_GUARD_RADIUS), width, height, TENDRIL_GUARD_RADIUS);
 
   const range = SOFT_CEILING - STRONG_THRESHOLD;
   for (let p = 0, i = 0; p < n; p++, i += 4) {
@@ -251,31 +317,20 @@ export function PortraitVideo({
       });
     }
 
-    let primed = false;
-    function prime() {
-      if (!video || primed) return;
-      primed = true;
-      // Not 0: seeks straight to the timeline's actual starting point (see
-      // VIDEO_TIME's first anchor, which matches this) rather than drawing
-      // frame 0 first — the clip's very first fraction of a second measured
-      // with real block-noise baked into its pixels, independent of
-      // resolution, resize method, or render path. `createImageBitmap`
-      // doesn't need the old play()-then-pause() "unlock" `drawImage` from
-      // a video element used to require, so this seeks directly.
-      video.currentTime = 0.5;
-      void draw();
-    }
-
+    // No priming seek here: the portrait timeline's own effect (a parent of
+    // this component, so it mounts *after* this one) seeks the video to its
+    // starting time unconditionally on every mount — see `applyProgress`
+    // being called right after `ScrollTrigger.create` in
+    // animations/portrait-timeline.ts. A second, redundant seek to that same
+    // target from here used to race it: whichever seek's `seeked` event
+    // landed last silently won, and the loser's in-flight decode sometimes
+    // composited into the frame that got captured — a real, if intermittent,
+    // source of corrupted pixels, not just a wasted seek. `seeked` below is
+    // the only draw trigger this needs; the video used to also need a
+    // play()-then-pause() "unlock" before a first `drawImage` would work,
+    // but `createImageBitmap` (what draw() actually uses) doesn't have that
+    // restriction.
     video.addEventListener("seeked", scheduleDraw);
-    video.addEventListener("loadeddata", prime);
-    if (video.readyState >= 2) prime();
-    // React dev-mode's double effect-invoke can mount/cleanup/remount this
-    // effect synchronously, and `loadeddata` won't fire again for an
-    // already-loaded video — re-check once more on the next tick in case the
-    // synchronous readyState check above ran mid-transition.
-    const fallbackTimer = window.setTimeout(() => {
-      if (video.readyState >= 2) prime();
-    }, 0);
 
     // Browsers throttle or defer video decode work for a backgrounded tab —
     // a page that loads (and primes its first frame) while not the active
@@ -289,10 +344,8 @@ export function PortraitVideo({
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
-      window.clearTimeout(fallbackTimer);
       if (rafId) cancelAnimationFrame(rafId);
       video.removeEventListener("seeked", scheduleDraw);
-      video.removeEventListener("loadeddata", prime);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [videoRef]);
