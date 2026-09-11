@@ -43,11 +43,8 @@ function computeLuma(data: Uint8ClampedArray, n: number) {
 // version — keeping x/y on their own stacks (no div/mod) and inlining the
 // push check (no per-call closure) brought a 360x640 frame from ~80-100ms
 // down to single-digit milliseconds.
-function floodFillFromBorder(luma: Float32Array, width: number, height: number) {
+function floodFillFromBorder(strong: Uint8Array, width: number, height: number) {
   const n = width * height;
-  const strong = new Uint8Array(n);
-  for (let p = 0; p < n; p++) strong[p] = luma[p] < STRONG_THRESHOLD ? 1 : 0;
-
   const visited = new Uint8Array(n);
   const stackX = new Int32Array(n);
   const stackY = new Int32Array(n);
@@ -135,7 +132,10 @@ function chromaKeyBlack(imageData: ImageData) {
   const { data, width, height } = imageData;
   const n = width * height;
   const luma = computeLuma(data, n);
-  const background = floodFillFromBorder(luma, width, height);
+
+  const strong = new Uint8Array(n);
+  for (let p = 0; p < n; p++) strong[p] = luma[p] < STRONG_THRESHOLD ? 1 : 0;
+  const background = floodFillFromBorder(strong, width, height);
 
   const range = SOFT_CEILING - STRONG_THRESHOLD;
   for (let p = 0, i = 0; p < n; p++, i += 4) {
@@ -259,11 +259,23 @@ export function PortraitVideo({
       if (video.readyState >= 2) prime();
     }, 0);
 
+    // Browsers throttle or defer video decode work for a backgrounded tab —
+    // a page that loads (and primes its first frame) while not the active
+    // tab, or a `play()` unlock that happens to land in that window, can end
+    // up with a genuinely corrupted first decode instead of just a slow one.
+    // Re-drawing once the page is actually visible catches and corrects that
+    // instead of leaving a bad frame on screen indefinitely.
+    function onVisible() {
+      if (document.visibilityState === "visible") scheduleDraw();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       window.clearTimeout(fallbackTimer);
       if (rafId) cancelAnimationFrame(rafId);
       video.removeEventListener("seeked", scheduleDraw);
       video.removeEventListener("loadeddata", prime);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [videoRef]);
 
