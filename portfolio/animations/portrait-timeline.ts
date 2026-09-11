@@ -255,9 +255,13 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
       trigger: wrapper,
       start: "top top",
       end: "bottom bottom",
-      // scrub: true (not a duration) ties progress 1:1 to scroll position —
-      // no easing lag chasing behind the scrollbar.
-      scrub: true,
+      // A small scrub duration adds a thin layer of trailing interpolation
+      // on top of Lenis's own smoothing, rounding off the last bit of
+      // micro-jitter for a more fluid feel. Safe now that the keying pass
+      // is single-digit milliseconds — this was `true` (1:1, zero lag)
+      // while the render cost itself was the bottleneck, since any added
+      // lag would have compounded with multi-hundred-ms frame stalls.
+      scrub: 0.35,
       onUpdate: (self) => applyProgress(self.progress),
     });
 

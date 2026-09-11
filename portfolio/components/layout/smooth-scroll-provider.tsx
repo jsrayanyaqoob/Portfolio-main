@@ -19,9 +19,13 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     if (reducedMotion) return;
 
     const lenis = new Lenis({
-      duration: 1.1,
-      easing: (t) => 1 - Math.pow(1 - t, 3),
+      duration: 1.3,
+      // Quintic ease-out — a longer, smoother tail than the previous cubic
+      // curve, so scroll settles more gradually instead of stopping short.
+      easing: (t) => 1 - Math.pow(1 - t, 5),
       smoothWheel: true,
+      syncTouch: true,
+      touchMultiplier: 1.5,
     });
     lenisRef.current = lenis;
     setLenisInstance(lenis);

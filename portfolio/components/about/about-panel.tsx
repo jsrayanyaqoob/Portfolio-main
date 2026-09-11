@@ -10,7 +10,7 @@ export function AboutPanel() {
         <span className="font-mono text-xs uppercase tracking-[0.35em] text-text-dim">About</span>
       </div>
       <p className="mt-6 text-balance font-display text-2xl font-medium leading-snug text-text sm:text-3xl">
-        I&apos;m {siteConfig.name}, a frontend developer focused on building modern, responsive, and interactive
+        I&apos;m {siteConfig.name}, a full stack engineer focused on building modern, responsive, and interactive
         digital products.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
