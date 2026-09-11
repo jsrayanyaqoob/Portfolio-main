@@ -18,11 +18,15 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (reducedMotion) return;
 
+    // Longer duration + a slower-settling curve (tried right before this)
+    // made scroll feel smoother in isolation but heavier and slower to
+    // respond overall — that's the wrong trade. Shorter duration and an
+    // ease-out that gets most of the way there quickly (then tapers, so it
+    // still doesn't feel abrupt) keeps it responsive without going back to
+    // feeling raw/unsmoothed.
     const lenis = new Lenis({
-      duration: 1.3,
-      // Quintic ease-out — a longer, smoother tail than the previous cubic
-      // curve, so scroll settles more gradually instead of stopping short.
-      easing: (t) => 1 - Math.pow(1 - t, 5),
+      duration: 0.8,
+      easing: (t) => 1 - Math.pow(1 - t, 2),
       smoothWheel: true,
       syncTouch: true,
       touchMultiplier: 1.5,
