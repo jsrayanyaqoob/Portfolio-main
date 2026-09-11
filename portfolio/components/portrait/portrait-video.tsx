@@ -8,26 +8,33 @@ import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
 
 const CANVAS_HEIGHT = 640;
-// This footage is shot on a plain black backdrop. His suit is navy, dark
-// enough on its shadowed side to land in the same luma range as the actual
-// backdrop. A per-pixel color check (comparing R/G/B to catch the suit's
-// faint blue cast vs. neutral black) seemed like the right discriminator,
-// but H.264's 4:2:0 chroma subsampling stores color at a quarter the
-// resolution of luma and re-derives it on decode — for pixels this close to
-// black, the real R/G/B gaps are only a few units wide, well inside that
-// subsampling's noise floor, so the color check flickered pixel-to-pixel
-// and punched a speckled hole through the shadow instead of a clean one.
-// Luma carries no such penalty (full resolution, no subsampling), so this
-// keys on luma alone and instead relies on flood-filling inward from the
-// canvas border to find the actual background: real background is one
-// large region connected to every edge, while the suit's shadow — even
-// where it's just as dark — is fully enclosed by lighter shirt/skin/hair
-// and never reachable from the border. A stricter "strong" threshold (well
-// under the suit's darkest measured pixels) drives the flood so it can't
-// bridge across a soft anti-aliased edge into the subject; a wider "soft"
-// ceiling only feathers pixels already reached, for a clean but anti-
-// aliased cutout.
-const STRONG_THRESHOLD = 16;
+// This footage is shot on a plain black backdrop. A per-pixel color check
+// (comparing R/G/B to catch the suit's faint blue cast vs. neutral black)
+// seemed like the right discriminator, but H.264's 4:2:0 chroma subsampling
+// stores color at a quarter the resolution of luma and re-derives it on
+// decode — for pixels this close to black, the real R/G/B gaps are only a
+// few units wide, well inside that subsampling's noise floor, so the color
+// check flickered pixel-to-pixel and punched a speckled hole through the
+// shadow instead of a clean one. Luma carries no such penalty (full
+// resolution, no subsampling), so this keys on luma alone and relies on
+// flood-filling inward from the canvas border to find the actual
+// background: real background is one large region connected to every edge,
+// while the suit's shadow — even where it's just as dark — is enclosed by
+// lighter shirt/skin/hair and (mostly) not reachable from the border.
+//
+// The real backdrop measures almost exactly 0 luma everywhere; the suit's
+// own shading, even in its deepest fold, measured no darker than ~2. That's
+// a wafer-thin but real gap, so STRONG_THRESHOLD sits just above the
+// backdrop's own noise floor rather than well below the suit's darkest
+// point (16, the earlier value) — that earlier margin was sized against a
+// handful of sampled frames, and a wider, more gradual shadow on other
+// frames dipped into it, connecting to the border and reading as
+// background across a wide, visible band. Keeping the margin this tight
+// does mean a residual sliver can still slip through on rare frames — a
+// smaller, tolerable artifact traded for the wide, tearing failure mode
+// this fixes. A wider "soft" ceiling still feathers already-reached pixels
+// for an anti-aliased cutout.
+const STRONG_THRESHOLD = 8;
 const SOFT_CEILING = 42;
 
 function computeLuma(data: Uint8ClampedArray, n: number) {
@@ -43,6 +50,16 @@ function computeLuma(data: Uint8ClampedArray, n: number) {
 // version — keeping x/y on their own stacks (no div/mod) and inlining the
 // push check (no per-call closure) brought a 360x640 frame from ~80-100ms
 // down to single-digit milliseconds.
+//
+// Tried guarding this against thin single-pixel bridges (erode the
+// candidate mask before flooding, dilate the result back after) to protect
+// enclosed shadow patches that happen to share the backdrop's exact value.
+// It backfired: on real, noisily-compressed video the true background
+// itself is rarely a perfect unbroken block, so eroding it before the flood
+// even starts often disconnects the border from everything past it —
+// measured as low as ~2% of the frame staying transparent, i.e. background
+// barely removed at all. That failure is worse than the speckling it was
+// meant to fix, so this keys directly off the plain (non-eroded) mask.
 function floodFillFromBorder(strong: Uint8Array, width: number, height: number) {
   const n = width * height;
   const visited = new Uint8Array(n);
@@ -238,14 +255,15 @@ export function PortraitVideo({
     function prime() {
       if (!video || primed) return;
       primed = true;
-      video.currentTime = 0;
-      // Some browsers won't decode a frame for drawImage until playback has
-      // started at least once; play-then-immediately-pause unlocks seeking.
-      video
-        .play()
-        .then(() => video.pause())
-        .then(draw)
-        .catch(() => {});
+      // Not 0: seeks straight to the timeline's actual starting point (see
+      // VIDEO_TIME's first anchor, which matches this) rather than drawing
+      // frame 0 first — the clip's very first fraction of a second measured
+      // with real block-noise baked into its pixels, independent of
+      // resolution, resize method, or render path. `createImageBitmap`
+      // doesn't need the old play()-then-pause() "unlock" `drawImage` from
+      // a video element used to require, so this seeks directly.
+      video.currentTime = 0.5;
+      void draw();
     }
 
     video.addEventListener("seeked", scheduleDraw);
@@ -261,10 +279,10 @@ export function PortraitVideo({
 
     // Browsers throttle or defer video decode work for a backgrounded tab —
     // a page that loads (and primes its first frame) while not the active
-    // tab, or a `play()` unlock that happens to land in that window, can end
-    // up with a genuinely corrupted first decode instead of just a slow one.
-    // Re-drawing once the page is actually visible catches and corrects that
-    // instead of leaving a bad frame on screen indefinitely.
+    // tab can end up with a genuinely corrupted first decode instead of
+    // just a slow one. Re-drawing once the page is actually visible catches
+    // and corrects that instead of leaving a bad frame on screen
+    // indefinitely.
     function onVisible() {
       if (document.visibilityState === "visible") scheduleDraw();
     }

@@ -93,7 +93,12 @@ function anchored(p: number, anchors: [number, number][]) {
 // --- Choreography anchor tables -------------------------------------------
 
 const VIDEO_TIME: [number, number][] = [
-  [0, 0],
+  // Matches portrait-video.tsx's prime(), which seeks here directly instead
+  // of frame 0 — see the chroma-key threshold comment there for why the
+  // literal first frames needed avoiding on top of the threshold fix. This
+  // is a neutral hold either way, so starting a little later costs nothing
+  // visually.
+  [0, 0.5],
   [BEAT.rayanShiftEnd, 1.5],
   [BEAT.lookLeftPeak, 3.0],
   [BEAT.giggleEnd, 4.25],
