@@ -190,11 +190,10 @@ export function PortraitVideo({
 
     let rafId = 0;
 
-    // The keying pass is cheap now (a single luma+saturation pass plus a
-    // small separable morphological close — single-digit milliseconds at
-    // this canvas size, versus the ~100-200ms the old per-pixel IDW
-    // reference model cost), so there's no need to move it off the main
-    // thread to keep scroll-linked GSAP updates smooth.
+    // The keying pass is cheap now (a luma-only border flood-fill —
+    // single-digit milliseconds at this canvas size, versus the ~100-200ms
+    // the old per-pixel IDW reference model cost), so there's no need to
+    // move it off the main thread to keep scroll-linked GSAP updates smooth.
     async function draw() {
       if (!video || !canvas || !ensureSize()) return;
       const c2d = canvas.getContext("2d", { willReadFrequently: true });
