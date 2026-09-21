@@ -27,7 +27,18 @@ export function PortraitVideo({
   // background; on light mode (the default) it showed as a hard black box.
   // The light-mode clip was shot/exported against a matching backdrop
   // instead, so no in-browser keying is needed either way.
-  const activeSrc = theme === "light" && lightSrc ? lightSrc : src;
+  const isLightClip = theme === "light" && !!lightSrc;
+  const activeSrc = isLightClip ? lightSrc : src;
+  // The light clip's own backdrop is a real photographed white, not a flat
+  // digital one — it measures anywhere from ~216 to ~245 depending on the
+  // corner (studio falloff), next to the page's literal #fff, so the frame
+  // edge was faintly visible as a box. A pure contrast push (not brightness,
+  // which also blew out his face/shirt at the levels needed) fixes that:
+  // contrast expands values away from mid-gray, so already-bright background
+  // gets shoved to true white while his midtone skin barely moves. Verified
+  // by sampling corner pixels across the clip's full timeline at 1.45 — every
+  // sampled frame hits exactly [255,255,255].
+  const clipFilter = isLightClip ? "contrast(1.45)" : undefined;
 
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
@@ -61,6 +72,7 @@ export function PortraitVideo({
           role="img"
           aria-label="Rayan"
           className="relative h-[68vh] w-auto select-none object-contain drop-shadow-sm sm:h-[85vh] md:h-[100svh]"
+          style={clipFilter ? { filter: clipFilter } : undefined}
         />
         <div
           aria-hidden
