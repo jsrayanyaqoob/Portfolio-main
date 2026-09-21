@@ -19,6 +19,7 @@ export const siteConfig = {
   portraitSrc: "/images/profile/rayan.png",
   portraitPlaceholder: "/images/profile/rayan-placeholder.svg",
   portraitVideoSrc: "/last-seekable.mp4",
+  portraitVideoSrcLight: "/whitevid.mp4",
   socials: {
     github: "",
     linkedin: "",

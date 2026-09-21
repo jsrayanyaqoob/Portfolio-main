@@ -22,13 +22,20 @@ export default function Home() {
 
   const hasVideo = existsSync(join(process.cwd(), "public", "last-seekable.mp4"));
   const videoSrc = hasVideo ? siteConfig.portraitVideoSrc : null;
+  const hasLightVideo = existsSync(join(process.cwd(), "public", "whitevid.mp4"));
+  const videoSrcLight = hasLightVideo ? siteConfig.portraitVideoSrcLight : null;
 
   return (
     <>
       <Navbar />
       <SectionObserver />
       <main id="main-content">
-        <PortraitExperience portraitSrc={portraitSrc} portraitSize={portraitSize} videoSrc={videoSrc} />
+        <PortraitExperience
+          portraitSrc={portraitSrc}
+          portraitSize={portraitSize}
+          videoSrc={videoSrc}
+          videoSrcLight={videoSrcLight}
+        />
         <Projects />
         <TechStack />
         <Experience />

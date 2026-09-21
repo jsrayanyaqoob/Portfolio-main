@@ -6,12 +6,15 @@ import { usePointerRef } from "@/hooks/use-pointer";
 import { useIsTouchDevice } from "@/hooks/use-media-query";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
+import { useTheme } from "@/hooks/use-theme";
 
 export function PortraitVideo({
   src,
+  lightSrc,
   videoRef,
 }: {
   src: string;
+  lightSrc: string | null;
   videoRef: RefObject<HTMLVideoElement | null>;
 }) {
   const isTouch = useIsTouchDevice();
@@ -19,6 +22,12 @@ export function PortraitVideo({
   const pointer = usePointerRef();
   const exploreCursor = useCursorHover("explore");
   const enableTilt = !isTouch && !reducedMotion;
+  const { theme } = useTheme();
+  // The black-backdrop clip only reads cleanly against the site's dark
+  // background; on light mode (the default) it showed as a hard black box.
+  // The light-mode clip was shot/exported against a matching backdrop
+  // instead, so no in-browser keying is needed either way.
+  const activeSrc = theme === "light" && lightSrc ? lightSrc : src;
 
   const rotateX = useMotionValue(0);
   const rotateY = useMotionValue(0);
@@ -45,7 +54,7 @@ export function PortraitVideo({
         />
         <video
           ref={videoRef}
-          src={src}
+          src={activeSrc}
           muted
           playsInline
           preload="auto"

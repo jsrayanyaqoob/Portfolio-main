@@ -19,10 +19,12 @@ export function PortraitExperience({
   portraitSrc,
   portraitSize,
   videoSrc,
+  videoSrcLight,
 }: {
   portraitSrc: string;
   portraitSize: { width: number; height: number };
   videoSrc: string | null;
+  videoSrcLight: string | null;
 }) {
   const reducedMotion = useReducedMotion();
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -82,7 +84,7 @@ export function PortraitExperience({
             first paint — centered since it's a bust crop, not a full body. */}
         <div ref={portraitRef} className="absolute inset-0 z-0 flex items-center justify-center">
           {videoSrc ? (
-            <PortraitVideo src={videoSrc} videoRef={videoRef} />
+            <PortraitVideo src={videoSrc} lightSrc={videoSrcLight} videoRef={videoRef} />
           ) : (
             <PortraitImage src={portraitSrc} size={portraitSize} />
           )}
@@ -136,7 +138,7 @@ export function PortraitExperience({
             the look-right turn as if reading it. */}
         <div
           ref={aboutPanelRef}
-          className="absolute inset-0 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"
+          className="absolute inset-x-0 bottom-0 top-12 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"
         >
           <AboutPanel />
         </div>
@@ -145,7 +147,7 @@ export function PortraitExperience({
             that same look-right turn, reading this one next. */}
         <div
           ref={skillsPanelRef}
-          className="absolute inset-0 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"
+          className="absolute inset-x-0 bottom-0 top-12 z-20 flex items-center justify-center px-6 opacity-0 sm:justify-end sm:pr-[7%] md:pr-[10%]"
         >
           <SkillsPanel />
         </div>
