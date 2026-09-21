@@ -93,11 +93,8 @@ function anchored(p: number, anchors: [number, number][]) {
 // --- Choreography anchor tables -------------------------------------------
 
 const VIDEO_TIME: [number, number][] = [
-  // Matches portrait-video.tsx's prime(), which seeks here directly instead
-  // of frame 0 — see the chroma-key threshold comment there for why the
-  // literal first frames needed avoiding on top of the threshold fix. This
-  // is a neutral hold either way, so starting a little later costs nothing
-  // visually.
+  // Starts a hair after frame 0 — a neutral hold either way, so this costs
+  // nothing visually.
   [0, 0.5],
   [BEAT.rayanShiftEnd, 1.5],
   [BEAT.lookLeftPeak, 3.0],
@@ -106,17 +103,16 @@ const VIDEO_TIME: [number, number][] = [
   // He's not actually turned right until ~6.0s (confirmed by re-checking the
   // actual footage frame-by-frame — 5.0-5.75 is still neutral/blinking, not
   // a turn). Holds through the About + Skills read, capped at 6.5 rather
-  // than the full ~7.25s he's turned — edge quality measured via the keyed
-  // canvas's own alpha channel degrades sharply from 6.6s on (a real halo,
-  // confirmed visually, not just noise) as he starts turning back.
+  // than the full ~7.25s he's turned — the clip's own compression gets
+  // visibly rougher from 6.6s on as he starts turning back.
   [BEAT.lookRightPeak, 6.0],
   [BEAT.lookRightHoldEnd, 6.5],
   [BEAT.backToCenter, 8.0],
   [BEAT.lookDownStart, 8.5],
-  // The last clean frame — past 9.7s the keyed edge degrades sharply again
-  // (likely the clip's own tail-end compression), so this holds here rather
-  // than scrubbing into it. Doesn't cost anything visually since portrait
-  // opacity is already fading to 0 by fadeOutEnd anyway.
+  // The last clean frame — past 9.7s the clip's compression degrades
+  // sharply again (its tail-end), so this holds here rather than scrubbing
+  // into it. Doesn't cost anything visually since portrait opacity is
+  // already fading to 0 by fadeOutEnd anyway.
   [BEAT.lookDownEnd, 9.7],
   [1, 9.7],
 ];
