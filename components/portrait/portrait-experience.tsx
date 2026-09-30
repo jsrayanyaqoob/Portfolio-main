@@ -7,8 +7,7 @@ import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { usePortraitTimeline, SCENES, type PortraitRefs } from "@/animations/portrait-timeline";
 import { scrollToId, scrollToProgress } from "@/lib/lenis-instance";
-import { PortraitVideo } from "@/components/portrait/portrait-video";
-import { PortraitImage } from "@/components/portrait/portrait-image";
+import { PortraitHoverReveal } from "@/components/portrait/portrait-hover-reveal";
 import { PortraitAnnotations } from "@/components/portrait/portrait-annotations";
 import { AboutPanel } from "@/components/about/about-panel";
 import { SkillsPanel } from "@/components/skills/skills-panel";
@@ -18,13 +17,11 @@ import { MagneticButton } from "@/components/ui/magnetic-button";
 export function PortraitExperience({
   portraitSrc,
   portraitSize,
-  videoSrc,
-  videoSrcLight,
+  portraitHoverSrc,
 }: {
   portraitSrc: string;
   portraitSize: { width: number; height: number };
-  videoSrc: string | null;
-  videoSrcLight: string | null;
+  portraitHoverSrc: string;
 }) {
   const reducedMotion = useReducedMotion();
   const isMobile = useMediaQuery("(max-width: 768px)");
@@ -38,7 +35,6 @@ export function PortraitExperience({
   const scrollCueRef = useRef<HTMLDivElement>(null);
   const aboutPanelRef = useRef<HTMLDivElement>(null);
   const skillsPanelRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   const refs: PortraitRefs = useMemo(
     () => ({
@@ -51,7 +47,6 @@ export function PortraitExperience({
       scrollCue: scrollCueRef,
       aboutPanel: aboutPanelRef,
       skillsPanel: skillsPanelRef,
-      video: videoRef,
     }),
     []
   );
@@ -83,11 +78,7 @@ export function PortraitExperience({
         {/* Portrait, behind the giant RAYAN typography, on screen from the
             first paint — centered since it's a bust crop, not a full body. */}
         <div ref={portraitRef} className="absolute inset-0 z-0 flex items-center justify-center">
-          {videoSrc ? (
-            <PortraitVideo src={videoSrc} lightSrc={videoSrcLight} videoRef={videoRef} />
-          ) : (
-            <PortraitImage src={portraitSrc} size={portraitSize} />
-          )}
+          <PortraitHoverReveal src={portraitSrc} hoverSrc={portraitHoverSrc} size={portraitSize} />
         </div>
 
         {/* Giant RAYAN typography, in front of the portrait */}

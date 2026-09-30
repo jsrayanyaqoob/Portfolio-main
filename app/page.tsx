@@ -20,10 +20,8 @@ export default function Home() {
   const portraitSrc = hasRealPortrait ? siteConfig.portraitSrc : siteConfig.portraitPlaceholder;
   const portraitSize = (hasRealPortrait && getImageSize(realPortraitPath)) || PLACEHOLDER_SIZE;
 
-  const hasVideo = existsSync(join(process.cwd(), "public", "last-seekable.mp4"));
-  const videoSrc = hasVideo ? siteConfig.portraitVideoSrc : null;
-  const hasLightVideo = existsSync(join(process.cwd(), "public", "whitevid.mp4"));
-  const videoSrcLight = hasLightVideo ? siteConfig.portraitVideoSrcLight : null;
+  const hasHoverPortrait = existsSync(join(process.cwd(), "public", "images", "profile", "rayan-hover.jpg"));
+  const portraitHoverSrc = hasHoverPortrait ? siteConfig.portraitHoverSrc : portraitSrc;
 
   return (
     <>
@@ -33,8 +31,7 @@ export default function Home() {
         <PortraitExperience
           portraitSrc={portraitSrc}
           portraitSize={portraitSize}
-          videoSrc={videoSrc}
-          videoSrcLight={videoSrcLight}
+          portraitHoverSrc={portraitHoverSrc}
         />
         <Projects />
         <TechStack />

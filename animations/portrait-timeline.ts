@@ -9,28 +9,21 @@ if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-// He's on screen from the very first paint — no walk-on, no off-screen start.
-// Scroll instead drives which way he's looking, scrubbing through a single
-// ~10s clip of head-turns: neutral -> looks left (giggles) -> looks right
-// (About, then Skills, reveal beside him once his eyes actually land there,
-// while he holds that turn) -> back to center -> looks down -> fades out as
-// the hero section ends. RAYAN slides left as soon as he starts, then fades
-// away entirely right after the giggle — it doesn't linger for the rest of
-// the scene.
+// He's on screen from the very first paint — no walk-on, no off-screen
+// start. Scroll instead drives the surrounding choreography: RAYAN slides
+// left then fades, annotations pulse in briefly, and About/Skills reveal
+// beside him one after another, all timed off these breakpoints.
 const BEAT = {
-  rayanShiftEnd: 0.06, // RAYAN has slid left — video ~1.5s, still neutral
-  lookLeftPeak: 0.14, // looks left — video ~3.0s
-  giggleEnd: 0.2, // the giggle/smile settles — video ~4.25s
-  rayanGone: 0.26, // RAYAN has fully faded out — video ~4.6s, he's blinking/neutral
-  // Fully turned AND settled looking right — not mid-turn. The About/Skills
-  // reveal is pinned to this same point, so it only appears once his eyes
-  // have actually landed on that side, not while he's still turning.
-  lookRightPeak: 0.34, // video ~6.0s
+  rayanShiftEnd: 0.06, // RAYAN has slid left
+  lookLeftPeak: 0.14, // annotations pulse in around here
+  giggleEnd: 0.2, // annotations settle
+  rayanGone: 0.26, // RAYAN has fully faded out
+  lookRightPeak: 0.34, // About starts revealing
   aboutOutSkillsIn: 0.52, // About fades out, Skills fades in
-  lookRightHoldEnd: 0.66, // still holding the look right — video ~6.5s, last clean frame
-  backToCenter: 0.72, // turns back to center — video ~8.0s
-  lookDownStart: 0.81, // starts looking down — video ~8.5s
-  lookDownEnd: 0.92, // looking down — video ~9.7s
+  lookRightHoldEnd: 0.66, // Skills finishes its hold
+  backToCenter: 0.72,
+  lookDownStart: 0.81,
+  lookDownEnd: 0.92,
   fadeOutEnd: 1, // fully faded, hero section done
 };
 
@@ -55,7 +48,6 @@ export interface PortraitRefs {
   scrollCue: RefObject<HTMLElement | null>;
   aboutPanel: RefObject<HTMLElement | null>;
   skillsPanel: RefObject<HTMLElement | null>;
-  video: RefObject<HTMLVideoElement | null>;
 }
 
 function clamp01(v: number) {
@@ -65,12 +57,6 @@ function clamp01(v: number) {
 /** Maps progress into a 0–1 value local to [start, end], clamped. */
 function local(progress: number, start: number, end: number) {
   return clamp01((progress - start) / (end - start));
-}
-
-function seekVideo(el: HTMLVideoElement, time: number) {
-  if (Math.abs(el.currentTime - time) > 0.008) {
-    el.currentTime = time;
-  }
 }
 
 /** Smoothstep ease — each beat settles in and out naturally instead of
@@ -91,31 +77,6 @@ function anchored(p: number, anchors: [number, number][]) {
 }
 
 // --- Choreography anchor tables -------------------------------------------
-
-const VIDEO_TIME: [number, number][] = [
-  // Starts a hair after frame 0 — a neutral hold either way, so this costs
-  // nothing visually.
-  [0, 0.5],
-  [BEAT.rayanShiftEnd, 1.5],
-  [BEAT.lookLeftPeak, 3.0],
-  [BEAT.giggleEnd, 4.25],
-  [BEAT.rayanGone, 4.6], // brief neutral moment (he blinks around here) as RAYAN finishes fading
-  // He's not actually turned right until ~6.0s (confirmed by re-checking the
-  // actual footage frame-by-frame — 5.0-5.75 is still neutral/blinking, not
-  // a turn). Holds through the About + Skills read, capped at 6.5 rather
-  // than the full ~7.25s he's turned — the clip's own compression gets
-  // visibly rougher from 6.6s on as he starts turning back.
-  [BEAT.lookRightPeak, 6.0],
-  [BEAT.lookRightHoldEnd, 6.5],
-  [BEAT.backToCenter, 8.0],
-  [BEAT.lookDownStart, 8.5],
-  // The last clean frame — past 9.7s the clip's compression degrades
-  // sharply again (its tail-end), so this holds here rather than scrubbing
-  // into it. Doesn't cost anything visually since portrait opacity is
-  // already fading to 0 by fadeOutEnd anyway.
-  [BEAT.lookDownEnd, 9.7],
-  [1, 9.7],
-];
 
 // xPercent shifts the h1 by a percentage of its OWN box, which spans the
 // full sticky container (~1270px on a 1280px viewport) — not just the
@@ -140,14 +101,14 @@ const RAYAN_OPACITY: [number, number][] = [
 
 // He holds his ground the whole scene — no walking — but gets a couple of
 // small nudges so he doesn't collide with text moving around him: right
-// while RAYAN is off to the left during the look-left/giggle beat, and left
-// while turned right so the About/Skills panels (right-aligned) clear him.
+// while RAYAN is off to the left early on, and left once About/Skills
+// (right-aligned) need to clear him.
 const PORTRAIT_X: [number, number][] = [
   [0, 0],
   [BEAT.rayanShiftEnd, 0],
   [BEAT.lookLeftPeak, 14],
   [BEAT.giggleEnd, 14],
-  [BEAT.rayanGone, 0], // settles back to center as he turns to look right
+  [BEAT.rayanGone, 0], // settles back to center before About/Skills reveal
   [BEAT.lookRightPeak, -18],
   [BEAT.lookRightHoldEnd, -18],
   [BEAT.backToCenter, 0],
@@ -169,7 +130,7 @@ const PORTRAIT_SCALE: [number, number][] = [
 const ANNOTATIONS_OPACITY: [number, number][] = [
   [0, 0],
   [BEAT.rayanShiftEnd, 0],
-  [BEAT.lookLeftPeak, 1], // up while he's turned, looking (and giggling)
+  [BEAT.lookLeftPeak, 1], // brief pulse-in early in the scroll
   [BEAT.giggleEnd, 1],
   [BEAT.giggleEnd + 0.04, 0],
 ];
@@ -187,7 +148,6 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
     const scrollCue = refs.scrollCue.current;
     const aboutPanel = refs.aboutPanel.current;
     const skillsPanel = refs.skillsPanel.current;
-    const video = refs.video.current;
 
     if (!wrapper || !eyebrow || !rayan || !portrait || !annotations || !tagline || !scrollCue || !aboutPanel || !skillsPanel) {
       return;
@@ -217,8 +177,8 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
         });
 
         // --- Portrait: always visible, mostly holds position — just a
-        // small nudge left while turned right so the panels clear him — and
-        // scrubs through the head-turn clip, fading out once the scene ends.
+        // small nudge left while turned right so the panels clear him —
+        // fading out once the scene ends.
         gsap.set(portrait, {
           xPercent: anchored(p, PORTRAIT_X) * xScale,
           scale: anchored(p, PORTRAIT_SCALE),
@@ -245,11 +205,6 @@ export function usePortraitTimeline(refs: PortraitRefs, enabled: boolean, isMobi
           y: gsap.utils.interpolate(16, 0, skillsIn),
           pointerEvents: skillsIn > 0.5 && skillsOut < 0.5 ? "auto" : "none",
         });
-
-        // --- Scrub the clip itself through the same choreography.
-        if (video && video.duration) {
-          seekVideo(video, anchored(p, VIDEO_TIME));
-        }
     }
 
     const trigger = ScrollTrigger.create({
