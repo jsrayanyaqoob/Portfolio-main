@@ -15,12 +15,12 @@ import { getImageSize } from "@/lib/image-size";
 const PLACEHOLDER_SIZE = { width: 640, height: 860 };
 
 export default function Home() {
-  const realPortraitPath = join(process.cwd(), "public", "images", "profile", "rayan.png");
+  const realPortraitPath = join(process.cwd(), "public", "images", "profile", "rayan-v2.png");
   const hasRealPortrait = existsSync(realPortraitPath);
   const portraitSrc = hasRealPortrait ? siteConfig.portraitSrc : siteConfig.portraitPlaceholder;
   const portraitSize = (hasRealPortrait && getImageSize(realPortraitPath)) || PLACEHOLDER_SIZE;
 
-  const hasHoverPortrait = existsSync(join(process.cwd(), "public", "images", "profile", "rayan-hover.png"));
+  const hasHoverPortrait = existsSync(join(process.cwd(), "public", "images", "profile", "rayan-hover-v2.png"));
   const portraitHoverSrc = hasHoverPortrait ? siteConfig.portraitHoverSrc : portraitSrc;
 
   return (
