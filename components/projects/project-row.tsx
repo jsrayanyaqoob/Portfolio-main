@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import type { Project } from "@/data/projects";
 import { Reveal } from "@/components/ui/reveal";
 import { useCursorHover } from "@/hooks/use-cursor";
@@ -60,17 +60,17 @@ export function ProjectRow({ project, index }: { project: Project; index: number
             <p className="mt-4 max-w-sm text-sm leading-relaxed text-text-dim">{project.shortDescription}</p>
             <p className="mt-4 font-mono text-xs text-text-faint">{project.technologies.join(" / ")}</p>
 
-            <div className="mt-6 flex flex-wrap items-center gap-5">
+            <div className="mt-6 flex flex-wrap items-center gap-3">
               {project.liveUrl ? (
                 <a
                   {...viewCursor}
                   href={project.liveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group/link inline-flex items-center gap-2 text-sm font-medium text-text underline-offset-4 hover:underline"
+                  className="group/link inline-flex items-center gap-2 rounded-full bg-text px-5 py-2.5 text-sm font-medium text-bg transition-colors hover:opacity-85"
                 >
-                  View Project
-                  <ArrowRight size={14} className="transition-transform group-hover/link:translate-x-1" />
+                  Live Demo
+                  <ArrowUpRight size={15} className="transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
                 </a>
               ) : (
                 <span className="text-sm text-text-faint">Link coming soon</span>
@@ -80,10 +80,10 @@ export function ProjectRow({ project, index }: { project: Project; index: number
                   href={project.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-text-dim transition-colors hover:text-text"
+                  className="inline-flex items-center gap-2 rounded-full border border-border-strong px-5 py-2.5 text-sm font-medium text-text-dim transition-colors hover:border-text hover:text-text"
                 >
-                  <GithubIcon size={14} />
-                  View Code
+                  <GithubIcon size={15} />
+                  GitHub
                 </a>
               )}
             </div>

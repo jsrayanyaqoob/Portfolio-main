@@ -2,16 +2,9 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const projects = [
-  { id: "cartify", label: "Cartify", c1: "#1a1a2e", c2: "#16213e", accent: "#6ee7b7" },
-  { id: "rentanything", label: "RentAnything", c1: "#1e1b2e", c2: "#2d1b3d", accent: "#c4b5fd" },
-  { id: "interview-arena", label: "Interview Arena", c1: "#12181f", c2: "#1c2b3a", accent: "#7dd3fc" },
   { id: "trading-platform", label: "Trading Platform", c1: "#141210", c2: "#241d14", accent: "#fbbf24" },
   { id: "chattrix", label: "Chattrix", c1: "#161421", c2: "#231a33", accent: "#f0abfc" },
-  { id: "resume-analyzer", label: "AI Resume Analyzer", c1: "#0f1a17", c2: "#132620", accent: "#5eead4" },
   { id: "smartprice", label: "SmartPrice", c1: "#181416", c2: "#2a1a1d", accent: "#fca5a5" },
-  { id: "wildrydez", label: "WildRydez", c1: "#151a12", c2: "#1f2b17", accent: "#a3e635" },
-  { id: "pakrent", label: "PakRent", c1: "#141821", c2: "#1a2436", accent: "#93c5fd" },
-  { id: "kitchenpartners", label: "KitchenPartners", c1: "#1b1512", c2: "#2b1f16", accent: "#fdba74" },
 ];
 
 const outDir = join(process.cwd(), "public", "images", "projects");

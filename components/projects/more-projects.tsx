@@ -1,6 +1,8 @@
 import Image from "next/image";
+import { ArrowUpRight } from "lucide-react";
 import type { Project } from "@/data/projects";
 import { Reveal } from "@/components/ui/reveal";
+import { GithubIcon } from "@/components/ui/brand-icons";
 
 export function MoreProjects({ projects }: { projects: Project[] }) {
   if (projects.length === 0) return null;
@@ -39,6 +41,33 @@ export function MoreProjects({ projects }: { projects: Project[] }) {
                 {project.category}
               </p>
               <h4 className="mt-1 font-display text-lg font-semibold text-text">{project.title}</h4>
+
+              {(project.liveUrl || project.githubUrl) && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {project.liveUrl && (
+                    <a
+                      href={project.liveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group/link inline-flex items-center gap-1.5 rounded-full bg-text px-4 py-2 text-xs font-medium text-bg transition-colors hover:opacity-85"
+                    >
+                      Live Demo
+                      <ArrowUpRight size={13} className="transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
+                    </a>
+                  )}
+                  {project.githubUrl && (
+                    <a
+                      href={project.githubUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border-strong px-4 py-2 text-xs font-medium text-text-dim transition-colors hover:border-text hover:text-text"
+                    >
+                      <GithubIcon size={13} />
+                      GitHub
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           </Reveal>
         ))}
