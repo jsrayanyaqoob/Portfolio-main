@@ -1,18 +1,28 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
-import { motion, useMotionValue, useSpring, useMotionTemplate, useAnimationFrame } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useMotionTemplate,
+  useAnimationFrame,
+} from "framer-motion";
 import { usePointerRef } from "@/hooks/use-pointer";
 import { useIsTouchDevice } from "@/hooks/use-media-query";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
 import { siteConfig } from "@/config/site";
 
-// Radius of the revealed circle, in viewport-height units so it scales with
-// the portrait itself (which is sized in vh) instead of growing/shrinking
-// with cursor position the way a percentage-based radial-gradient would.
-const REVEAL_RADIUS_VH = 16;
+// Radius of the fully-open reveal circle, in viewport-height units so it
+// scales with the portrait itself (which is sized in vh) instead of
+// growing/shrinking with cursor position the way a percentage-based
+// radial-gradient would.
+const REVEAL_RADIUS_VH = 18;
+const FEATHER_VH = 5;
+const SCANNER_PAD_VH = 3;
 
 export function PortraitHoverReveal({
   src,
@@ -42,18 +52,36 @@ export function PortraitHoverReveal({
     rotateX.set(-p.y * 3);
   });
 
+  const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const revealX = useMotionValue(50);
   const revealY = useMotionValue(50);
   // Snappier than the tilt spring — this is meant to feel like it's tracking
   // the cursor closely, just smoothed enough to not look like a hard cutout.
-  const springConfig = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 220, damping: 26, mass: 0.4 };
-  const springX = useSpring(revealX, springConfig);
-  const springY = useSpring(revealY, springConfig);
-  const revealOpacity = useMotionValue(0);
-  const springOpacity = useSpring(revealOpacity, { stiffness: 260, damping: 30 });
+  const trackingSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 260, damping: 24, mass: 0.35 };
+  const springX = useSpring(revealX, trackingSpring);
+  const springY = useSpring(revealY, trackingSpring);
 
-  const maskImage = useMotionTemplate`radial-gradient(circle ${REVEAL_RADIUS_VH}vh at ${springX}% ${springY}%, black 0, black ${REVEAL_RADIUS_VH - 4}vh, transparent ${REVEAL_RADIUS_VH}vh)`;
+  // The reveal opens/closes like an iris rather than just fading in place —
+  // radius springs from 0 to full on enter. A slightly underdamped spring
+  // gives it a bit of overshoot ("pop") on open instead of easing in flatly.
+  const radius = useMotionValue(0);
+  const radiusSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 170, damping: 15, mass: 0.6 };
+  const springRadius = useSpring(radius, radiusSpring);
+  const springInnerRadius = useTransform(springRadius, (r) => Math.max(r - FEATHER_VH, 0));
+  const ringDiameter = useTransform(springRadius, (r) => r * 2);
+  const scannerDiameter = useTransform(ringDiameter, (d) => d + SCANNER_PAD_VH * 2);
+
+  const maskImage = useMotionTemplate`radial-gradient(circle ${springRadius}vh at ${springX}% ${springY}%, black 0, black ${springInnerRadius}vh, transparent ${springRadius}vh)`;
+  const ringOpacity = useTransform(springRadius, [0, 4], [0, 1]);
+
+  // Pre-templated (hooks must run unconditionally, before any early return
+  // or conditional JSX) so the conditionally-rendered scanner ring below can
+  // just reference these instead of calling hooks inline.
+  const ringLeft = useMotionTemplate`${springX}%`;
+  const ringTop = useMotionTemplate`${springY}%`;
+  const ringDiameterVh = useMotionTemplate`${ringDiameter}vh`;
+  const scannerDiameterVh = useMotionTemplate`${scannerDiameter}vh`;
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (!enableReveal) return;
@@ -64,11 +92,14 @@ export function PortraitHoverReveal({
   }
 
   function handlePointerEnter() {
-    if (enableReveal) revealOpacity.set(1);
+    if (!enableReveal) return;
+    radius.set(REVEAL_RADIUS_VH);
+    setIsHovering(true);
   }
 
   function handlePointerLeave() {
-    revealOpacity.set(0);
+    radius.set(0);
+    setIsHovering(false);
   }
 
   return (
@@ -101,17 +132,26 @@ export function PortraitHoverReveal({
           <>
             <motion.div
               aria-hidden
-              className="pointer-events-none absolute inset-0"
-              style={{ opacity: springOpacity, maskImage, WebkitMaskImage: maskImage }}
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              style={{ maskImage, WebkitMaskImage: maskImage }}
             >
-              <Image
-                src={hoverSrc}
-                alt=""
-                fill
-                sizes="(max-width: 640px) 70vw, (max-width: 768px) 50vw, 40vw"
-                className="object-contain"
-                draggable={false}
-              />
+              {/* Slightly zoomed for a "lens" feel — revealing more than a
+                  flat 1:1 crop would, so it reads as looking *through* the
+                  cutout rather than just an image swap. */}
+              <motion.div
+                className="absolute inset-0"
+                animate={isHovering ? { scale: 1.14 } : { scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <Image
+                  src={hoverSrc}
+                  alt=""
+                  fill
+                  sizes="(max-width: 640px) 70vw, (max-width: 768px) 50vw, 40vw"
+                  className="object-contain"
+                  draggable={false}
+                />
+              </motion.div>
             </motion.div>
 
             {/* Soft glow ring tracing the edge of the reveal circle. */}
@@ -119,16 +159,41 @@ export function PortraitHoverReveal({
               aria-hidden
               className="pointer-events-none absolute rounded-full border border-text/70"
               style={{
-                left: useMotionTemplate`${springX}%`,
-                top: useMotionTemplate`${springY}%`,
-                width: `${REVEAL_RADIUS_VH * 2}vh`,
-                height: `${REVEAL_RADIUS_VH * 2}vh`,
+                left: ringLeft,
+                top: ringTop,
+                width: ringDiameterVh,
+                height: ringDiameterVh,
                 translateX: "-50%",
                 translateY: "-50%",
-                opacity: springOpacity,
-                boxShadow: "0 0 24px 4px rgba(255,255,255,0.35)",
+                opacity: ringOpacity,
+                boxShadow: "0 0 30px 6px rgba(255,255,255,0.4)",
               }}
             />
+
+            {/* Rotating "scanner" ring — a conic gradient masked down to a
+                thin band, spinning continuously while hovered, for the extra
+                bit of energy around the reveal edge. */}
+            {isHovering && (
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute rounded-full"
+                style={{
+                  left: ringLeft,
+                  top: ringTop,
+                  width: scannerDiameterVh,
+                  height: scannerDiameterVh,
+                  translateX: "-50%",
+                  translateY: "-50%",
+                  opacity: ringOpacity,
+                  background:
+                    "conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.9) 12%, transparent 26%, transparent 50%, rgba(255,255,255,0.9) 62%, transparent 76%, transparent 100%)",
+                  WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
+                  mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
+                }}
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
+              />
+            )}
           </>
         )}
 

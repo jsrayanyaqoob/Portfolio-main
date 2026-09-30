@@ -18,7 +18,7 @@ export const siteConfig = {
     "Frontend Developer with 1+ year of experience building responsive web applications using React, Next.js, JavaScript, and Firebase.",
   portraitSrc: "/images/profile/rayan.png",
   portraitPlaceholder: "/images/profile/rayan-placeholder.svg",
-  portraitHoverSrc: "/images/profile/rayan-hover.jpg",
+  portraitHoverSrc: "/images/profile/rayan-hover.png",
   socials: {
     github: "",
     linkedin: "",

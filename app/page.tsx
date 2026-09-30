@@ -20,7 +20,7 @@ export default function Home() {
   const portraitSrc = hasRealPortrait ? siteConfig.portraitSrc : siteConfig.portraitPlaceholder;
   const portraitSize = (hasRealPortrait && getImageSize(realPortraitPath)) || PLACEHOLDER_SIZE;
 
-  const hasHoverPortrait = existsSync(join(process.cwd(), "public", "images", "profile", "rayan-hover.jpg"));
+  const hasHoverPortrait = existsSync(join(process.cwd(), "public", "images", "profile", "rayan-hover.png"));
   const portraitHoverSrc = hasHoverPortrait ? siteConfig.portraitHoverSrc : portraitSrc;
 
   return (
