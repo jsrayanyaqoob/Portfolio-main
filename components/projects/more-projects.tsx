@@ -16,7 +16,7 @@ export function MoreProjects({ projects }: { projects: Project[] }) {
         {projects.map((project, i) => (
           <Reveal key={project.id} delay={(i % 3) * 0.06}>
             <div className="group">
-              <div className="relative aspect-[4/3] w-full overflow-hidden rounded-sm bg-surface">
+              <div className="relative aspect-video w-full overflow-hidden rounded-sm border border-border bg-surface">
                 {project.liveUrl ? (
                   <a href={project.liveUrl} target="_blank" rel="noopener noreferrer">
                     <Image
@@ -24,7 +24,7 @@ export function MoreProjects({ projects }: { projects: Project[] }) {
                       alt={project.title}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
-                      className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                      className="object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                     />
                   </a>
                 ) : (
@@ -33,7 +33,7 @@ export function MoreProjects({ projects }: { projects: Project[] }) {
                     alt={project.title}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                    className="object-contain transition-transform duration-500 ease-out group-hover:scale-105"
                   />
                 )}
               </div>
