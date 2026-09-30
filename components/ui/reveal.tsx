@@ -5,8 +5,8 @@ import type { ReactNode } from "react";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
 const variants: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0 },
+  hidden: { opacity: 0, y: 36, scale: 0.96 },
+  visible: { opacity: 1, y: 0, scale: 1 },
 };
 
 const staticVariants: Variants = {
