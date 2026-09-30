@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import Image from "next/image";
 import {
   motion,
@@ -16,13 +16,14 @@ import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
 import { siteConfig } from "@/config/site";
 
-// Radius of the fully-open reveal circle, in viewport-height units so it
-// scales with the portrait itself (which is sized in vh) instead of
-// growing/shrinking with cursor position the way a percentage-based
-// radial-gradient would.
-const REVEAL_RADIUS_VH = 18;
-const FEATHER_VH = 5;
-const SCANNER_PAD_VH = 3;
+// The reveal is a wipe, not a spotlight: a circle grows from wherever the
+// cursor enters until it's far larger than the portrait itself, so the
+// second photo ends up covering the whole image rather than just a patch
+// around the cursor. 150vh comfortably exceeds the diagonal of the
+// portrait box at any breakpoint (it tops out around 100svh tall), so the
+// circle is always fully past every edge by the time it finishes growing.
+const EXPANDED_RADIUS_VH = 150;
+const FEATHER_VH = 14;
 
 export function PortraitHoverReveal({
   src,
@@ -52,7 +53,6 @@ export function PortraitHoverReveal({
     rotateX.set(-p.y * 3);
   });
 
-  const [isHovering, setIsHovering] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const revealX = useMotionValue(50);
   const revealY = useMotionValue(50);
@@ -62,26 +62,26 @@ export function PortraitHoverReveal({
   const springX = useSpring(revealX, trackingSpring);
   const springY = useSpring(revealY, trackingSpring);
 
-  // The reveal opens/closes like an iris rather than just fading in place —
-  // radius springs from 0 to full on enter. A slightly underdamped spring
-  // gives it a bit of overshoot ("pop") on open instead of easing in flatly.
+  // The wipe grows from 0 to EXPANDED_RADIUS_VH on enter and back to 0 on
+  // leave. Heavier/slower than the old spotlight's spring on purpose — this
+  // distance is huge (0 to 150vh), so a snappy spring would cross it almost
+  // instantly and read as a hard cut instead of a sweep. This settles in
+  // ~0.5-0.6s, slow enough to actually see the front move across the image.
   const radius = useMotionValue(0);
-  const radiusSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 170, damping: 15, mass: 0.6 };
+  const radiusSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 55, damping: 16, mass: 1 };
   const springRadius = useSpring(radius, radiusSpring);
   const springInnerRadius = useTransform(springRadius, (r) => Math.max(r - FEATHER_VH, 0));
   const ringDiameter = useTransform(springRadius, (r) => r * 2);
-  const scannerDiameter = useTransform(ringDiameter, (d) => d + SCANNER_PAD_VH * 2);
 
   const maskImage = useMotionTemplate`radial-gradient(circle ${springRadius}vh at ${springX}% ${springY}%, black 0, black ${springInnerRadius}vh, transparent ${springRadius}vh)`;
-  const ringOpacity = useTransform(springRadius, [0, 4], [0, 1]);
+  // Fades in fast at the very start of the grow so the wipe's leading edge
+  // (the ring below) is visible from the first frame, not just once it's
+  // partway open.
+  const ringOpacity = useTransform(springRadius, [0, 8, EXPANDED_RADIUS_VH * 0.4, EXPANDED_RADIUS_VH * 0.7], [0, 1, 1, 0]);
 
-  // Pre-templated (hooks must run unconditionally, before any early return
-  // or conditional JSX) so the conditionally-rendered scanner ring below can
-  // just reference these instead of calling hooks inline.
   const ringLeft = useMotionTemplate`${springX}%`;
   const ringTop = useMotionTemplate`${springY}%`;
   const ringDiameterVh = useMotionTemplate`${ringDiameter}vh`;
-  const scannerDiameterVh = useMotionTemplate`${scannerDiameter}vh`;
 
   function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
     if (!enableReveal) return;
@@ -93,13 +93,11 @@ export function PortraitHoverReveal({
 
   function handlePointerEnter() {
     if (!enableReveal) return;
-    radius.set(REVEAL_RADIUS_VH);
-    setIsHovering(true);
+    radius.set(EXPANDED_RADIUS_VH);
   }
 
   function handlePointerLeave() {
     radius.set(0);
-    setIsHovering(false);
   }
 
   return (
@@ -132,29 +130,22 @@ export function PortraitHoverReveal({
           <>
             <motion.div
               aria-hidden
-              className="pointer-events-none absolute inset-0 overflow-hidden"
+              className="pointer-events-none absolute inset-0"
               style={{ maskImage, WebkitMaskImage: maskImage }}
             >
-              {/* Slightly zoomed for a "lens" feel — revealing more than a
-                  flat 1:1 crop would, so it reads as looking *through* the
-                  cutout rather than just an image swap. */}
-              <motion.div
-                className="absolute inset-0"
-                animate={isHovering ? { scale: 1.14 } : { scale: 1 }}
-                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <Image
-                  src={hoverSrc}
-                  alt=""
-                  fill
-                  sizes="(max-width: 640px) 70vw, (max-width: 768px) 50vw, 40vw"
-                  className="object-contain"
-                  draggable={false}
-                />
-              </motion.div>
+              <Image
+                src={hoverSrc}
+                alt=""
+                fill
+                sizes="(max-width: 640px) 70vw, (max-width: 768px) 50vw, 40vw"
+                className="object-contain"
+                draggable={false}
+              />
             </motion.div>
 
-            {/* Soft glow ring tracing the edge of the reveal circle. */}
+            {/* The wipe's leading edge — a glow ring riding the growing
+                circle's boundary, visible while it crosses the image and
+                fading out once it's grown past the point of mattering. */}
             <motion.div
               aria-hidden
               className="pointer-events-none absolute rounded-full border border-text/70"
@@ -169,31 +160,6 @@ export function PortraitHoverReveal({
                 boxShadow: "0 0 30px 6px rgba(255,255,255,0.4)",
               }}
             />
-
-            {/* Rotating "scanner" ring — a conic gradient masked down to a
-                thin band, spinning continuously while hovered, for the extra
-                bit of energy around the reveal edge. */}
-            {isHovering && (
-              <motion.div
-                aria-hidden
-                className="pointer-events-none absolute rounded-full"
-                style={{
-                  left: ringLeft,
-                  top: ringTop,
-                  width: scannerDiameterVh,
-                  height: scannerDiameterVh,
-                  translateX: "-50%",
-                  translateY: "-50%",
-                  opacity: ringOpacity,
-                  background:
-                    "conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.9) 12%, transparent 26%, transparent 50%, rgba(255,255,255,0.9) 62%, transparent 76%, transparent 100%)",
-                  WebkitMask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
-                  mask: "radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 3px))",
-                }}
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 2.4, ease: "linear" }}
-              />
-            )}
           </>
         )}
 
