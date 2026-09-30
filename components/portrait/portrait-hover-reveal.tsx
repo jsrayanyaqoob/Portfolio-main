@@ -16,14 +16,13 @@ import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import { useCursorHover } from "@/hooks/use-cursor";
 import { siteConfig } from "@/config/site";
 
-// The reveal is a wipe, not a spotlight: a circle grows from wherever the
-// cursor enters until it's far larger than the portrait itself, so the
-// second photo ends up covering the whole image rather than just a patch
-// around the cursor. 150vh comfortably exceeds the diagonal of the
-// portrait box at any breakpoint (it tops out around 100svh tall), so the
-// circle is always fully past every edge by the time it finishes growing.
-const EXPANDED_RADIUS_VH = 150;
-const FEATHER_VH = 14;
+// A localized "liquid" blob that follows the cursor — NOT a wipe that grows
+// to cover the whole image. Hovering the head should only reveal the head;
+// moving to the shoulder reveals the shoulder instead. The softness (a wide
+// feather relative to the radius) is what gives it the liquid/organic feel
+// rather than reading as a hard-edged geometric circle.
+const REVEAL_RADIUS_VH = 22;
+const FEATHER_VH = 12;
 
 export function PortraitHoverReveal({
   src,
@@ -56,28 +55,25 @@ export function PortraitHoverReveal({
   const containerRef = useRef<HTMLDivElement>(null);
   const revealX = useMotionValue(50);
   const revealY = useMotionValue(50);
-  // Snappier than the tilt spring — this is meant to feel like it's tracking
-  // the cursor closely, just smoothed enough to not look like a hard cutout.
-  const trackingSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 260, damping: 24, mass: 0.35 };
+  // Deliberately a bit loose (lower stiffness, more damping) rather than
+  // rigidly locked to the cursor — a small, visible lag as it "catches up"
+  // is what reads as liquid/fluid instead of a mechanical cutout snapping
+  // to the pointer position.
+  const trackingSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 150, damping: 20, mass: 0.5 };
   const springX = useSpring(revealX, trackingSpring);
   const springY = useSpring(revealY, trackingSpring);
 
-  // The wipe grows from 0 to EXPANDED_RADIUS_VH on enter and back to 0 on
-  // leave. Heavier/slower than the old spotlight's spring on purpose — this
-  // distance is huge (0 to 150vh), so a snappy spring would cross it almost
-  // instantly and read as a hard cut instead of a sweep. This settles in
-  // ~0.5-0.6s, slow enough to actually see the front move across the image.
+  // Radius springs from 0 to REVEAL_RADIUS_VH on enter, back to 0 on leave —
+  // this distance is small, so a fairly snappy spring still looks smooth
+  // rather than instant.
   const radius = useMotionValue(0);
-  const radiusSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 55, damping: 16, mass: 1 };
+  const radiusSpring = reducedMotion ? { stiffness: 1000, damping: 100 } : { stiffness: 200, damping: 20, mass: 0.5 };
   const springRadius = useSpring(radius, radiusSpring);
   const springInnerRadius = useTransform(springRadius, (r) => Math.max(r - FEATHER_VH, 0));
   const ringDiameter = useTransform(springRadius, (r) => r * 2);
 
   const maskImage = useMotionTemplate`radial-gradient(circle ${springRadius}vh at ${springX}% ${springY}%, black 0, black ${springInnerRadius}vh, transparent ${springRadius}vh)`;
-  // Fades in fast at the very start of the grow so the wipe's leading edge
-  // (the ring below) is visible from the first frame, not just once it's
-  // partway open.
-  const ringOpacity = useTransform(springRadius, [0, 8, EXPANDED_RADIUS_VH * 0.4, EXPANDED_RADIUS_VH * 0.7], [0, 1, 1, 0]);
+  const ringOpacity = useTransform(springRadius, [0, 6], [0, 1]);
 
   const ringLeft = useMotionTemplate`${springX}%`;
   const ringTop = useMotionTemplate`${springY}%`;
@@ -93,7 +89,7 @@ export function PortraitHoverReveal({
 
   function handlePointerEnter() {
     if (!enableReveal) return;
-    radius.set(EXPANDED_RADIUS_VH);
+    radius.set(REVEAL_RADIUS_VH);
   }
 
   function handlePointerLeave() {
@@ -143,9 +139,7 @@ export function PortraitHoverReveal({
               />
             </motion.div>
 
-            {/* The wipe's leading edge — a glow ring riding the growing
-                circle's boundary, visible while it crosses the image and
-                fading out once it's grown past the point of mattering. */}
+            {/* Soft glow ring tracing the edge of the liquid blob. */}
             <motion.div
               aria-hidden
               className="pointer-events-none absolute rounded-full border border-text/70"
